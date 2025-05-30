@@ -1,9 +1,4 @@
--- 504 Plan Status Breakdown
-SELECT
-    plan_504_status_label,
-    plan_504_count,
-    plan_504_percent
-FROM (
+WITH plan_504_cte AS (
     SELECT
         CASE sped.SEC504PLANSTATUS
             WHEN '00' THEN 'Not in a 504 plan during the school year (00)'
@@ -29,15 +24,8 @@ FROM (
         100.0
     FROM students stu
     LEFT JOIN PS.S_MA_STU_SPED_X sped ON stu.dcid = sped.STUDENTSDCID
-)
-;
-
--- English Learner Code Breakdown
-SELECT
-    english_learner_code,
-    el_count,
-    el_percent
-FROM (
+),
+english_learner_cte AS (
     SELECT
         CASE
             WHEN LOWER(ext.EL) IN ('frmr', 'former') THEN 'Former'
@@ -69,15 +57,8 @@ FROM (
         100.0
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
-)
-;
-
--- SPED Code Breakdown
-SELECT
-    sped_code,
-    sped_count,
-    sped_percent
-FROM (
+),
+sped_cte AS (
     SELECT
         CASE
             WHEN LOWER(ext.SPED) = 'yes' THEN 'Yes'
@@ -104,14 +85,30 @@ FROM (
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
 )
-;
-
--- Ethnicity Label Breakdown
-SELECT
-    ethnicity_label,
-    ethnicity_count,
-    ethnicity_percent
-FROM (
+, gender_cte AS (
+    SELECT
+        CASE
+            WHEN LOWER(stu.gender) = 'm' THEN 'Male'
+            WHEN LOWER(stu.gender) = 'f' THEN 'Female'
+            ELSE 'Unknown'
+        END AS gender_label,
+        COUNT(*) AS gender_count,
+        ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS gender_percent
+    FROM students stu
+    GROUP BY
+        CASE
+            WHEN LOWER(stu.gender) = 'm' THEN 'Male'
+            WHEN LOWER(stu.gender) = 'f' THEN 'Female'
+            ELSE 'Unknown'
+        END
+    UNION ALL
+    SELECT
+        'Total',
+        COUNT(*),
+        100.0
+    FROM students stu
+)
+, ethnicity_cte AS (
     SELECT
         CASE stu.ethnicity
             WHEN '01' THEN 'African'
@@ -266,22 +263,81 @@ FROM (
         100.0
     FROM students stu
 )
-;
+, numbered_504 AS (
+    SELECT plan_504_status_label, plan_504_count, plan_504_percent,
+           ROW_NUMBER() OVER (ORDER BY plan_504_status_label) AS rn
+    FROM plan_504_cte
+)
+, numbered_el AS (
+    SELECT english_learner_code, el_count, el_percent,
+           ROW_NUMBER() OVER (ORDER BY english_learner_code) AS rn
+    FROM english_learner_cte
+)
+, numbered_sped AS (
+    SELECT sped_code, sped_count, sped_percent,
+           ROW_NUMBER() OVER (ORDER BY CASE WHEN sped_code = 'Total' THEN 0 ELSE 1 END, sped_code) AS rn
+    FROM sped_cte
+)
+, numbered_gender AS (
+    SELECT gender_label, gender_count, gender_percent,
+           ROW_NUMBER() OVER (ORDER BY CASE WHEN gender_label = 'Total' THEN 0 ELSE 1 END, gender_label) AS rn
+    FROM gender_cte
+)
+, numbered_ethnicity AS (
+    SELECT ethnicity_label, ethnicity_count, ethnicity_percent,
+           ROW_NUMBER() OVER (ORDER BY CASE WHEN ethnicity_label = 'Total' THEN 0 ELSE 1 END, ethnicity_label) AS rn
+    FROM ethnicity_cte
+)
+SELECT
+    g.gender_label,
+    g.gender_count,
+    g.gender_percent,
+    s.sped_code,
+    s.sped_count,
+    s.sped_percent,
+    p.plan_504_status_label,
+    p.plan_504_count,
+    p.plan_504_percent,
+    e.english_learner_code,
+    e.el_count,
+    e.el_percent,
+    eth.ethnicity_label,
+    eth.ethnicity_count,
+    eth.ethnicity_percent
+FROM (
+    SELECT plan_504_status_label, plan_504_count, plan_504_percent, ROW_NUMBER() OVER (ORDER BY CASE WHEN plan_504_status_label = 'Total' THEN 0 ELSE 1 END, plan_504_status_label) AS rn
+    FROM plan_504_cte
+) p
+FULL OUTER JOIN (
+    SELECT english_learner_code, el_count, el_percent, ROW_NUMBER() OVER (ORDER BY CASE WHEN english_learner_code = 'Total' THEN 0 ELSE 1 END, english_learner_code) AS rn
+    FROM english_learner_cte
+) e ON p.rn = e.rn
+FULL OUTER JOIN (
+    SELECT sped_code, sped_count, sped_percent, ROW_NUMBER() OVER (ORDER BY CASE WHEN sped_code = 'Total' THEN 0 ELSE 1 END, sped_code) AS rn
+    FROM sped_cte
+) s ON p.rn = s.rn OR e.rn = s.rn
+FULL OUTER JOIN (
+    SELECT gender_label, gender_count, gender_percent, ROW_NUMBER() OVER (ORDER BY CASE WHEN gender_label = 'Total' THEN 0 ELSE 1 END, gender_label) AS rn
+    FROM gender_cte
+) g ON p.rn = g.rn OR e.rn = g.rn OR s.rn = g.rn
+FULL OUTER JOIN (
+    SELECT ethnicity_label, ethnicity_count, ethnicity_percent, ROW_NUMBER() OVER (ORDER BY CASE WHEN ethnicity_label = 'Total' THEN 0 ELSE 1 END, ethnicity_label) AS rn
+    FROM ethnicity_cte
+) eth ON p.rn = eth.rn OR e.rn = eth.rn OR s.rn = eth.rn OR g.rn = eth.rn
+ORDER BY COALESCE(p.rn, e.rn, s.rn, g.rn, eth.rn);
 
--- Gender Breakdown
-SELECT
-    gender,
-    COUNT(*) AS gender_count,
-    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS percent_of_total
-FROM
-    students
-GROUP BY
-    gender
-UNION ALL
-SELECT
-    'Total',
-    COUNT(*),
-    100.0
-FROM
-    students
-;
+<th>Gender</th>
+<th>Gender Count</th>
+<th>Gender Percent</th>
+<th>SPED Code</th>
+<th>SPED Count</th>
+<th>SPED Percent</th>
+<th>SPED 504 Code</th>
+<th>SPED 504 Count</th>
+<th>SPED 504 Percent</th>
+<th>English Learner Code</th>
+<th>English Learner Count</th>
+<th>English Learner Percent</th>
+<th>Ethnicity</th>
+<th>Ethnicity Count</th>
+<th>Ethnicity Percent</th>
