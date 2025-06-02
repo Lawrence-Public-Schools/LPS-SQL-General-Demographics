@@ -10,6 +10,7 @@ WITH plan_504_cte AS (
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS plan_504_percent
     FROM students stu
     LEFT JOIN PS.S_MA_STU_SPED_X sped ON stu.dcid = sped.STUDENTSDCID
+    WHERE stu.enroll_status = 0
     GROUP BY
         CASE sped.SEC504PLANSTATUS
             WHEN '00' THEN 'Not in a 504 plan during the school year (00)'
@@ -24,6 +25,7 @@ WITH plan_504_cte AS (
         100.0
     FROM students stu
     LEFT JOIN PS.S_MA_STU_SPED_X sped ON stu.dcid = sped.STUDENTSDCID
+    WHERE stu.enroll_status = 0
 ),
 english_learner_cte AS (
     SELECT
@@ -40,6 +42,7 @@ english_learner_cte AS (
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS el_percent
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
+    WHERE stu.enroll_status = 0
     GROUP BY
         CASE
             WHEN LOWER(ext.EL) IN ('frmr', 'former') THEN 'Former'
@@ -57,6 +60,7 @@ english_learner_cte AS (
         100.0
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
+    WHERE stu.enroll_status = 0
 ),
 sped_cte AS (
     SELECT
@@ -70,6 +74,7 @@ sped_cte AS (
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS sped_percent
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
+    WHERE stu.enroll_status = 0
     GROUP BY
         CASE
             WHEN LOWER(ext.SPED) = 'yes' THEN 'Yes'
@@ -84,6 +89,7 @@ sped_cte AS (
         100.0
     FROM students stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
+    WHERE stu.enroll_status = 0
 )
 , gender_cte AS (
     SELECT
@@ -95,6 +101,7 @@ sped_cte AS (
         COUNT(*) AS gender_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS gender_percent
     FROM students stu
+    WHERE stu.enroll_status = 0
     GROUP BY
         CASE
             WHEN LOWER(stu.gender) = 'm' THEN 'Male'
@@ -107,6 +114,7 @@ sped_cte AS (
         COUNT(*),
         100.0
     FROM students stu
+    WHERE stu.enroll_status = 0
 )
 , ethnicity_cte AS (
     SELECT
@@ -184,6 +192,7 @@ sped_cte AS (
         COUNT(*) AS ethnicity_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS ethnicity_percent
     FROM students stu
+    WHERE stu.enroll_status = 0
     GROUP BY
         CASE stu.ethnicity
             WHEN '01' THEN 'African'
@@ -262,6 +271,7 @@ sped_cte AS (
         COUNT(*),
         100.0
     FROM students stu
+    WHERE stu.enroll_status = 0
 )
 , numbered_504 AS (
     SELECT plan_504_status_label, plan_504_count, plan_504_percent,
