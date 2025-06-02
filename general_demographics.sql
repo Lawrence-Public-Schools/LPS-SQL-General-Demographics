@@ -1,4 +1,22 @@
-WITH plan_504_cte AS (
+WITH student_base AS (
+    SELECT
+        stu.id AS student_id,
+        stu.student_number,
+        stu.dcid,
+        stu.state_studentnumber AS state_id,
+        stu.lastfirst AS student_lastfirst,
+        ext.SPED,
+        ext.EL,
+        stu.schoolid,
+        stu.gender,
+        stu.ethnicity
+    FROM
+        students stu
+        JOIN ~[temp.table.current.selection:students] stusel ON stusel.dcid = stu.dcid
+        LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
+    WHERE stu.enroll_status = 0
+),
+plan_504_cte AS (
     SELECT
         CASE sped.SEC504PLANSTATUS
             WHEN '00' THEN 'Not in a 504 plan during the school year (00)'
@@ -8,9 +26,8 @@ WITH plan_504_cte AS (
         END AS plan_504_status_label,
         COUNT(*) AS plan_504_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS plan_504_percent
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN PS.S_MA_STU_SPED_X sped ON stu.dcid = sped.STUDENTSDCID
-    WHERE stu.enroll_status = 0
     GROUP BY
         CASE sped.SEC504PLANSTATUS
             WHEN '00' THEN 'Not in a 504 plan during the school year (00)'
@@ -23,9 +40,8 @@ WITH plan_504_cte AS (
         'Total',
         COUNT(*),
         100.0
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN PS.S_MA_STU_SPED_X sped ON stu.dcid = sped.STUDENTSDCID
-    WHERE stu.enroll_status = 0
 ),
 english_learner_cte AS (
     SELECT
@@ -40,9 +56,8 @@ english_learner_cte AS (
         END AS english_learner_code,
         COUNT(*) AS el_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS el_percent
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
-    WHERE stu.enroll_status = 0
     GROUP BY
         CASE
             WHEN LOWER(ext.EL) IN ('frmr', 'former') THEN 'Former'
@@ -58,9 +73,8 @@ english_learner_cte AS (
         'Total',
         COUNT(*),
         100.0
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
-    WHERE stu.enroll_status = 0
 ),
 sped_cte AS (
     SELECT
@@ -72,9 +86,8 @@ sped_cte AS (
         END AS sped_code,
         COUNT(*) AS sped_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS sped_percent
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
-    WHERE stu.enroll_status = 0
     GROUP BY
         CASE
             WHEN LOWER(ext.SPED) = 'yes' THEN 'Yes'
@@ -87,11 +100,10 @@ sped_cte AS (
         'Total',
         COUNT(*),
         100.0
-    FROM students stu
+    FROM student_base stu
     LEFT JOIN U_DEF_EXT_STUDENTS ext ON stu.dcid = ext.STUDENTSDCID
-    WHERE stu.enroll_status = 0
-)
-, gender_cte AS (
+),
+gender_cte AS (
     SELECT
         CASE
             WHEN LOWER(stu.gender) = 'm' THEN 'Male'
@@ -100,8 +112,7 @@ sped_cte AS (
         END AS gender_label,
         COUNT(*) AS gender_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS gender_percent
-    FROM students stu
-    WHERE stu.enroll_status = 0
+    FROM student_base stu
     GROUP BY
         CASE
             WHEN LOWER(stu.gender) = 'm' THEN 'Male'
@@ -113,10 +124,9 @@ sped_cte AS (
         'Total',
         COUNT(*),
         100.0
-    FROM students stu
-    WHERE stu.enroll_status = 0
-)
-, ethnicity_cte AS (
+    FROM student_base stu
+),
+ethnicity_cte AS (
     SELECT
         CASE stu.ethnicity
             WHEN '01' THEN 'African'
@@ -191,8 +201,7 @@ sped_cte AS (
         END AS ethnicity_label,
         COUNT(*) AS ethnicity_count,
         ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS ethnicity_percent
-    FROM students stu
-    WHERE stu.enroll_status = 0
+    FROM student_base stu
     GROUP BY
         CASE stu.ethnicity
             WHEN '01' THEN 'African'
@@ -270,8 +279,7 @@ sped_cte AS (
         'Total',
         COUNT(*),
         100.0
-    FROM students stu
-    WHERE stu.enroll_status = 0
+    FROM student_base stu
 )
 , numbered_504 AS (
     SELECT plan_504_status_label, plan_504_count, plan_504_percent,
